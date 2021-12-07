@@ -487,9 +487,9 @@ g0: if moduleEnabled /= 0 generate
 					when x"0004" => readDataBuffer <= x"5555";-- test
 					when x"0006" => readDataBuffer <= x"aaaa";-- test
 					when x"0008" => readDataBuffer <= x"2020";-- jahr
-					when x"000a" => readDataBuffer <= x"0005";-- monat
-					when x"000c" => readDataBuffer <= x"0028";-- tag 
-					when x"000e" => readDataBuffer <= x"0216";-- version
+					when x"000a" => readDataBuffer <= x"0011";-- monat
+					when x"000c" => readDataBuffer <= x"0005";-- tag 
+					when x"000e" => readDataBuffer <= x"0217";-- version
 					when x"0010" => readDataBuffer <= x"00" & modus;--modusregister read&write
 					when x"0012" => readDataBuffer <= (not dummycnt) & dummycnt; inccnt <= not controlBus.address(0) xor modus(0);
 						-- wenn modus(0)=0 dann wird auf adresse "0012" getriggert
