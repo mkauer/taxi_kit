@@ -42,7 +42,7 @@ architecture Behavioral of panelPower is
 	
 begin
 
-	nPowerOn <= not(powerOn); -- & powerOn & powerOn);
+	nPowerOn <= powerOn; -- Taxi-3.1  Taxi-3.2;
 
 	P1:process (registerWrite.clock)
 	begin
