@@ -1,0 +1,118 @@
+Infos zu TXAXI/ICESCINT FPGA Design:
+
+Frequenzen:
+
+-- in die Reihenfolge wie im Constrains Editor angegeben:
+
+1	25 Mhz	Quarz	direkter Quarzeingang
+2	10 Mhz	Quarz	direkter Quarzeingang
+derived Clocks:(über PLL im FPGA erzeugte Clocks)
+3	10 Mhz		
+4	125 Mhz	
+5	30 Mhz	
+6	25 Mhz	
+7	60 Mhz
+8	420 Mhz	-- vermutlich LVDS-Takt für den A/D wandler 1:7 Multiplexed 60 Mbit
+9	60 Mhz	
+10	950 Mhz	
+11	118,75 Mhz  wird für Registerinterface verwendet
+
+Timing:
+
+Ich habe versucht, das Design für den Spartan im Speedgrade -2 (langsamere Version) zu compilieren, hierbei gab es viele Timingfehler, insbesondere
+auf dem Datenbus (Signal "readDataBuffer"). Hieraus kann man zwei Dinge folgern:
+1. Falls auf einer der Baugruppen ein anderer Speedgrade statt -3 (es gibt noch -3N und -2, ist auf dem Baustein zu lesen) verwendet wurde,
+ wären damit die Fehler beim Lesezugriff erklärbar.
+2. Das Signal "readDataBuffer" ist vom Timing her kritisch, daher ist auch beim Betrieb ausserhalb der Specs (viele Minusgrade) hier am ehesten 
+ein Fehlverhalten zu erwarten.
+
+Registerinterface:
+
+nach aussen geführte Signale fangen mit "EBI1" an. Die Signale EBI1_NWAIT und EBI1_MCK werden nicht verwendet.
+das Modul "smcBusWrapper" taktet die Signale in die 118.75 Mhz Domäne ein und erzeugt synchrone 1 takt lange read und write pulse.
+Ab hier heisst der Bus "addressAndControlBus". Es werden hier bits ausmaskiert, vom externen Bus werden nur 16 Adressen verwendet.
+
+
+entity registerInterface_iceScint:
+
+
+im Code ist folgender Kommentar zu finden:
+
+-- address 0x0000-0x0fff has to be the same for all taxi based systems
+-- address 0x1000-0x1fff is used for icescint
+-- address 0x2000-0x2fff is used for polarstern
+-- address 0x3000-0x3fff is used for taxi classic (24ch. version)
+
+es gibt aber auch 3 register auf anderen adressen (f000,f002,f004):
+	
+when x"f000" => readDataBuffer <= x"000" & "000" & ltm9007_14_0r.fifoEmptyA;
+when x"f002" => readDataBuffer <= x"000" & "000" & ltm9007_14_0r.fifoValidA;
+when x"f004" => readDataBuffer <= x"00" & ltm9007_14_0r.fifoWordsA;
+
+Die read zugriffe lassen sich -mit einer Ausnahme- einfach von 1*16 auf 2*8 bit umbauen.
+Auf der Adresse x"0100" wird ein fifo ausgelesen, welches mit jedem read weitergeschaltet wird, was beim Umbau zu beachten ist.
+
+Es gibt sehr viele write-Zugriffe, die events auslösen (im FPGA-Code erkennbar an dem Kommentar "-autoreset"), was evtl. Komplikationen beim split
+auf 2*8 Bit Zugriff hervorruft.
+
+
+
+Erste Modifikationen:
+
+Vorab habe ich das alte Design compiliert,das resultierende Bitfile ist bis auf das Datum dasselbe wie das im .git Verzeichnis abgelegte 
+"icescint_180710_00.bit" File -> alles passt zusammen.
+
+Die timingkritische Gleichung für die Lesedaten "readDataBuffer" konnte erheblich besser gestaltet werden, da dieses Signal keinen Reset benötigt.
+Damit ist die Decodierung nicht in der grossen if/then/else Verknüpfung. Hiermit kann das Design auch für den langsameren Speedgrade ohne Timingfehler 
+compiliert werden.
+
+Auf Adresse 0000 und 0002 sind ein 8 und ein 16 Bit Read/Write Register implementiert, das war schon bisher so, 
+hiermit lässt sich ein einfacher Test des Zugriffs machen.
+Zusätzlich sind folgende Register neu implementiert, hier ein auszug aus dem VHDL-Code:
+
+	when x"0004" => readDataBuffer <= x"5555";--test
+	when x"0006" => readDataBuffer <= x"aaaa";--test
+	when x"0008" => readDataBuffer <= x"0019";-- jahr
+	when x"000a" => readDataBuffer <= x"0005";-- monat
+	when x"000c" => readDataBuffer <= x"0028";-- tag 
+	when x"000e" => readDataBuffer <= x"0001";--version
+	when x"0010" => readDataBuffer <= x"00" & modus;--Neues modusregister read & write
+	when x"0012" => readDataBuffer <= (not dummycnt) & dummycnt; inccnt <= not controlBus.address(0) xor modus(0);
+
+Read-zugriffe:
+
+Read-zugriffe auf gerade adressen funktionieren wie bisher, es werden die 16 bit ausgegeben, von denen der Arm auch nur 8 lsbs verwenden kann.
+Read-zugriffe auf ungerade adressen, was meines Wissens nur bei 8 Bit Zugriffen möglich ist, geben dieselben Daten wie Zugriffe auf auf die 
+nächstkleinere Adresse aus, wobei die 8 lsbs mit den 8 msbs vertauscht sind.
+
+Triggern durch read-Zugriff:
+Auf adresse 0100 wird das Fifo gelesen und das Weiterschalten des Fifos getriggert.
+der lesevorgang ist wie oben beschrieben, die Triggerfunktion funktioniert wie folgt:
+
+-- wenn modus(0)=0 dann wird auf adresse "0100" getriggert
+-- wenn modus(0)=1 dann wird auf adresse "0101" getriggert
+
+Bei bisherigen 16 bit Zugriffen muss das neue Modusregister, Bit 0 auf 0 stehen, bei 2*8 Bit Zugriffen muss das Bit abhäbgig von der Reihenfolge
+der beiden Zugriffe gesetzt werden, so dass die Triggerfunktion auf den 2. Zugriff erfolgt.
+
+Write Zugriffe:
+Die Write zugriffe wurden wie folgt modifiziert:
+normalerweise funktionieren die Zugriffe wie bisher. Um auf 8 bit Modus umzuschalten, muss man bit 2 im "modus" register setzen.
+Dann sollte ein write vom Arm zunächst die 8MSBs der Registerwerts in ein Pufferregister (bits (7..0)an adresse 20) schreiben, 
+und dann die LSBs wie bisher an die Write-Adresse.
+
+
+Zusätzliche Modifikationen:
+
+Falls zunächst keine 8 bit zugriffe von Arm aus verfügbar sind, sind auch keine ungeraden adressen ansprechbar.
+Deshalb wurde zunächst noch folgender Workarund implementiert:
+Um auf ungerade Adressen von 0000 bis 3fff zuzugreifen, kann man alternativ auf gerade Adressen von 4000 bis 7fff zuzugreifen. (read und write)
+Um auf ungerade Adressen von c000 bis ffff zuzugreifen, kann man alternativ auf gerade Adressen von 8000 bis bfff zuzugreifen. (read und write)
+dieser Workaround ist nur für debug-zwecke und sollte später wieder entfernt werden.
+
+
+ 
+
+
+
+

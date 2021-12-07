@@ -1,0 +1,56 @@
+Infos zu TXAXI/ICESCINT FPGA Design:
+
+Modifikationen 29_7_2019:
+
+Zugriffe auf den I2C-Bus:
+
+
+Writeregister:
+command(48bit)
+Send(1bit)
+Readregister:
+Idle(1bit)
+Rxdat(16bit)
+
+Das Kommandoregister ist wie folgt aufgebaut:
+
+Hex "AABBCCDDEEFF"
+
+Die ersten 8 Bit bestimmen die Art des I2C-Zugriffs:
+Bit(7..5) Fixed to "100"
+Bit(4..3) Readdata length-1
+Bit(2..1) Writedata length-2
+Bit(0) Read / not Write (1=read)
+
+Die weiteren Daten "BB" Bis "FF" sind die schreibdaten.
+
+Für den Zugriff auf die 2 Bausteine PCA9555 sind hierbei folgende Kombinationen sinnvoll:
+
+Write 8 Bit Daten:
+AA="80"   -> send writeadress + 2 Bytes  (I2Cadress,subadress,data)
+Write 16 Bit Daten:
+AA="82"   -> send writeadress + 3 Bytes  (I2Cadress,subadress,data0,data1)
+Read 8 Bit Daten:
+AA="81"   -> send writeadress + 1 Byte; send readadress,read Byte (I2Cadress,subadress)
+Read 16 Bit Daten:
+AA="89"   -> send writeadress + 1 Byte; send readadress,read 2 Bytes (I2Cadress,subadress)
+
+
+Für die Steuerung der PCA9555 Bausteine sind zur initialisierung folgende Zugriffe nötig (hier zur Vereinfachung erstmal nur 8Bit):
+Die 2 Bausteine haben die adressen 40/41(W/R) und 42/43(W/R)
+
+Comand:"80400200xxxx" setze Port0 IC6 Ausgänge auf 0.
+Comand:"80400600xxxx" setze Port0 IC6 auf Ausgang.
+Comand:"80420600xxxx" setze Port0 IC9 auf Ausgang.
+
+Dann können mit den Folgenden Commandos die Steuerleitungen geschaltet und gelesen werden:
+(Achtung, im Datenblatt PCA9555 ist das, was beim I2C Protokoll subadress genannt wird, als command byte bezeichnet)
+
+Comand:"804002MMxxxx" setze Port0 IC6 Ausgänge auf MM. (MM ist 8Bit-wert für PWR_EN1..8) 
+Comand:"804202MMxxxx" setze Port0 IC9 Ausgänge auf MM. MM bits 2..0 sind adresse für den RS485 Zugriff , Bit3 aktiviert die 
+									 Umschaltung auf direkte RS485 Kommunikation) 
+
+Comand:"804101xxxxxx" liest Port1 IC6 Eingänge (PWR_Fault1..8)
+Comand:"804301xxxxxx" liest Port1 IC9 Eingänge (Bits 7 und 6 sind PWRMON1 und 0)
+
+

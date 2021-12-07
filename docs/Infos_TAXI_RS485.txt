@@ -1,0 +1,60 @@
+
+Serielle Schnittstelle RS485:
+
+Es sind 8 rs485 implementiert. 
+empfangsseitig ist pro Kanal ein Fifo für 256 Bytes vorgesehen.
+
+diese werden mit folgenden Registern angesteuert:
+Writeregister:
+
+		when x"1300" => iceTad_0w.rs485Data(0) <= dataBusbuf(7 downto 0); --RW-Register
+		when x"1302" => iceTad_0w.rs485Data(1) <= dataBusbuf(7 downto 0); --RW-Register
+		when x"1304" => iceTad_0w.rs485Data(2) <= dataBusbuf(7 downto 0); --RW-Register
+		when x"1306" => iceTad_0w.rs485Data(3) <= dataBusbuf(7 downto 0); --RW-Register
+		when x"1308" => iceTad_0w.rs485Data(4) <= dataBusbuf(7 downto 0); --RW-Register
+		when x"130a" => iceTad_0w.rs485Data(5) <= dataBusbuf(7 downto 0); --RW-Register
+		when x"130c" => iceTad_0w.rs485Data(6) <= dataBusbuf(7 downto 0); --RW-Register
+		when x"130e" => iceTad_0w.rs485Data(7) <= dataBusbuf(7 downto 0); --RW-Register
+		when x"1310" => iceTad_0w.rs485TxStart <= dataBusbuf(7 downto 0); --RW-Register (=iceTad_0r.rs485TxBusy)
+		when x"1318" => iceTad_0w.rs485FifoClear <= dataBusbuf(7 downto 0); 
+		when x"131a" => iceTad_0w.rs485FifoRead <= dataBusbuf(7 downto 0); 
+		when x"131c" => iceTad_0w.softTxEnable <= dataBusbuf(7 downto 0); --RW-Register
+		when x"131e" => iceTad_0w.softTxMask <= dataBusbuf(7 downto 0);   --RW-Register
+
+Infos: Jedes zu sendende Byte mus zunächst in das iceTad_0w.rs485Data(0) register geschrieben werden, (vorher sollte man sehen ob txbusy , besser auch
+rxbusy 0 ist); dann wird der transfer über iceTad_0w.rs485TxStart (Maske für 8 kanäle) gestartet werden. Aktuell wird mit 9600 Baud gesendet.
+
+code:			rs485DataEnable(i) <= softTxEnable(i) when softTxMask(i) = '1' else txBusy(i);
+der ausgang ist normalerweise (softTxMask(i)=0) nur während dem aktiveb senden aktiviert. 
+Wenn softTxMask(i)=1 ist kann der Aushang über softTxEnable(i) kontinuierlich aktiviert bleiben. (sinnvoll für spätere Bidirektionale Kommunikation)
+
+
+
+Readregister:
+	
+		when x"10f0" => readDataBuffer <= x"00" & iceTad_0r.powerOn;
+		when x"1300" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoData(0);--RW-Register
+		when x"1302" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoData(1);--RW-Register
+		when x"1304" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoData(2);--RW-Register
+		when x"1306" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoData(3);--RW-Register
+		when x"1308" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoData(4);--RW-Register
+		when x"130a" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoData(5);--RW-Register
+		when x"130c" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoData(6);--RW-Register
+		when x"130e" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoData(7);--RW-Register
+		when x"1310" => readDataBuffer <= x"00" & iceTad_0r.rs485TxBusy;     --RW-Register (=iceTad_0w.rs485TxStart)
+		when x"1312" => readDataBuffer <= x"00" & iceTad_0r.rs485RxBusy;
+		when x"1314" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoFull;
+		when x"1316" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoEmpty;
+		when x"131c" => readDataBuffer <= x"00" & iceTad_0r.softTxEnable;	--RW-Register
+		when x"131e" => readDataBuffer <= x"00" & iceTad_0r.softTxMask;		--RW-Register
+		when x"1320" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoWords(0); 
+		when x"1322" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoWords(1);
+		when x"1324" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoWords(2);
+		when x"1326" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoWords(3);
+		when x"1328" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoWords(4);
+		when x"132a" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoWords(5);
+		when x"132c" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoWords(6);
+		when x"132e" => readDataBuffer <= x"00" & iceTad_0r.rs485FifoWords(7);
+
+Empfangen ist soweit erkennbar völlig unabhängig vom senden, man sieht anhand der readregs wiviele daten im fifo sind. 
+
