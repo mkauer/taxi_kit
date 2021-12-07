@@ -1,0 +1,176 @@
+Infos zu Umbau auf 3 Kanäle:
+
+
+
+Modifikationen ab Sept. 2019:
+
+1.	Writeshiftregister jetzt auch schreibbar, default weiterhin "ff". 
+	adr "10ac" drs4_0w.writeShiftRegister (new 2019_9)  -> muss für x4 Cascading auf x"11" gesetzt werden.
+
+2.	adr "1114"  eventFifoSystem_0w.drs4ChipSelector hat neue Funktionen:
+	untere 4 Bits:
+	Werte 0 bis 2 bedeuten wie bisher Kanalauswahl 0 bis 2.
+	mit anderen werten lässt sich das paralelle Auslesen der Fifos aktivieren:
+		code:
+		case registerWrite.drs4ChipSelector(3 downto 0) is 
+				when "0000" =>						wr <= "001";  -- write channel 0		
+				when "0001" =>						wr <= "010";  -- write channel 1	
+				when "0010" =>						wr <= "100";  -- write channel 2		
+				when "0011" =>						wr <= "011";  -- write channel 0&1		
+				when "0100" =>						wr <= "101";  -- write channel 0&2		
+				when "0101" =>						wr <= "110";  -- write channel 1&2		
+				when others =>						wr <= "111";  -- write channel 0&1&2
+//3.	neues Register  adr "10ee"   ltm9007_14_0w.debugFifocontrol; 
+//	zum Synchronisieren der Fifos der 3 Kanäle:
+//	0: no sync									--wie bisher...
+//	1: fifoempty Registered (read 1 clock später)	
+//	2: fifoempty synchronisiert zwischen den 2 Kanälen und read 1 clock später	
+//	3: fifoempty synchronisiert zwischen allen 6 Kanälen und read 1 clock später	-- sollte für 3-kanal betrieb richtig sein, ist jetzt default aktiv--
+rom 0																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																					
+4.   	Neue Signale in LTM9007_14_adcdata und DRS4ADC:  ( zur synchronisation der 3 Fifos )
+		ChannelID : in std_logic_vector(1 downto 0);
+		fifoemptyout : out std_logic_vector(1 downto 0);
+		fifoemptyinA : in std_logic_vector(1 downto 0);
+		fifoemptyinB : in std_logic_vector(1 downto 0);
+
+5. 	"10b4" ltm9007_14_0w.bitslipStart hat jetzt 3 bit für die 3 Kanäle
+
+6. 	"10b4" ltm9007_14_0r.bitslipFailed  hat jetzt 6 bit für die 3 Kanäle  -- Achtung! ist noch nicht angeschlossen (read nur channel 0)
+
+7. 	Register "10e2" ltm9007_14_0w.offsetCorrectionRamAddress
+        hat jetzt 2 Bits mehr (11 und 10), in diesen wird codiert welcher Speicher gerade angeschlossen ist. Es sind damit jetzt 3
+	getrennt schreibbare Offsetcorrectionrams verfügbar. 
+	Readfunktion kann noch eingebaut werden,
+	bisher sollte beim read immer spur 0 von kanal 0 gelesen werden.
+
+
+8. 	Im Datentyp "DRS4Cascading" sind jetzt die cascadingdaten aller 3 Kanäle codiert:
+		eventFifoInSlots(1) <= x"00" & drs4Chip0.drs4Data.cascadingData;
+		eventFifoInSlots(2) <= x"00" & drs4Chip1.drs4Data.cascadingData;
+		eventFifoInSlots(3) <= x"00" & drs4Chip2.drs4Data.cascadingData;
+
+9.	Auf adresse 1100h ist das Register Packetconfig, im folgenden code erkennt man welche bits und damit datenpakete hiermit gesendet werden.
+	Default ist das register auf "0006", so dass baseline und charge aktiviert sind. Diese Datenblocks sollten nun auch entsprechend der Anzahl der kanäle dem Datenblock folgen.
+		hier sollte zum Test bit6 gesetzt werden (set writeDrs4CascadingToFifo_bit =1) Die region of interest ist weiterhin im header codiert.
+
+	signal packetConfig : std_logic_vector(15 downto 0);
+	 alias writeDrs4SamplingToFifo_bit : std_logic is packetConfig(0);
+	 alias writeDrs4BaselineToFifo_bit : std_logic is packetConfig(1);
+	 alias writeDrs4ChargeToFifo_bit : std_logic is packetConfig(2);
+	 alias writeDrs4TimingToFifo_bit : std_logic is packetConfig(3);
+	 alias writeDrs4MaxValueToFifo_bit : std_logic is packetConfig(4);
+	 alias writeTriggerTimingToFifo_bit : std_logic is packetConfig(5);
+	 alias writeDrs4CascadingToFifo_bit : std_logic is packetConfig(6);
+	 alias testDataEventFifoStatic_bit : std_logic is packetConfig(8);
+	 alias testDataEventFifoCounter_bit : std_logic is packetConfig(9);
+	 alias writeMiscToFifo_bit : std_logic is packetConfig(11);
+	 alias writeWhiteRabbitToFifo_bit : std_logic is packetConfig(12);
+	 alias writeGpsToFifo_bit : std_logic is packetConfig(13);
+	 alias writePixelRatesToFifo_bit : std_logic is packetConfig(14);
+	 alias writeDebugToFifo_bit : std_logic is packetConfig(15);
+
+10.	Das register Readoutmode addr 11aah aktiviert verschiedene auslesemodi, wird von der ARm sw üblicherweise auf 6 gesetzt.
+	hier die möglichkeiten:
+	
+	if   (registerWrite.readoutMode = x"0") then	stateDrs4 <= readFull;
+	elsif(registerWrite.readoutMode = x"1") then	stateDrs4 <= readRoi;
+	elsif(registerWrite.readoutMode = x"2") then	stateDrs4 <= debug;
+	elsif(registerWrite.readoutMode = x"3") then	stateDrs4 <= debug;
+	elsif(registerWrite.readoutMode = x"4") then	stateDrs4 <= readFull2;
+	elsif(registerWrite.readoutMode = x"5") then	stateDrs4 <= readRoi2;
+	elsif(registerWrite.readoutMode = x"6") then	stateDrs4 <= readRoi3;
+	else						stateDrs4 <= readFull;
+	end if;
+
+11.	Die Datenblöcke Baseline und charge (je 2*144bits) sind jetzt je nach kanalzahl 2 oder 3-fach vorhanden, Die kanalnummer ist in den Bits
+	10 und 11 des ersten 16 bit blocks codiert.
+
+12.	Temperatursensor tmp05 ist an pin y17 angeschlossen, die 2 control pins sind auf masse.
+	kann mit Registern 300h bis 304 ausgelesen werden.Temperatur in Celsius ist: =421-(751*Th/Tl)  (siehe excel sheet)
+
+13.	Temperatursensor tmp112 ist an Netze testdacscl und testdacsda (pins aa2 und w20)  angeschlossen, bisher unused. 
+	Ist jetzt an demselben I2C Bus angeschlossen wie das Fanout board. Hier sind auch TESTDACs angeschlossen(ad5321),
+	die wohl bisher nicht verwendet werden.
+	Folgende sequenzen werden benötigt (Subadresse ist per hw-Pin auf 90h/91h festgelegt):
+	
+	-- Achtung, im Datenblatt ist eine etwas unübliche I2C Sequenz fürs Lesen angegeben
+	-- Repeated start und Stopcondition, die nicht dem Standartd entspricht. Ist vermutlich ein Fehler...
+	
+	Write 16 Bit Daten:
+	AA="82"   -> send writeadress + 3 Bytes  (I2Cadress,subadress,data0,data1)	
+	Read 16 Bit Daten:
+	AA="89"   -> send writeadress + 1 Byte; send readadress,read 2 Bytes (I2Cadress,subadress)
+
+	Hier eine Beispielsequenz:
+	Write Config Register: 		Comand:"829001AABBxx" -> Schreibe AABB ins Config register
+	Read Config Register:  		Comand:"899001xxxxxx" -> Lese Config Register, Ergebnis steht in I2c-Register RXDAT
+	Read Temperatur Register:  	Comand:"899000xxxxxx" -> Lese Temp Register, Ergebnis steht in I2c-Register RXDAT
+
+	Die Temperatur steht Left-aligned im Temp register und ist wie folgt umzurechnen:
+
+	Umrechnung positiver 12 Bit Wert in Celsius:
+	Beispiel: 0011 0010 0000 = 320h = 800 × (0.0625°C / LSB) = 50°C
+
+	Umrechnung negativer 12 Bit Wert in Celsius:
+	Beispiel: 1110 0111 0000 has twos compliment of 0001 1001 0000 = 0001 1000 1111 + 1
+	Umrechnung: 0001 1001 0000 = 190h = 400; 400 × (0.0625°C / LSB) = 25°C = (|–25°C|);
+			(|–25°C|) × (–1) = –25°C
+
+14.	Cascading data ist jetzt für alle 3 Kanäle im Datenblock "A" in den ersten 3 Wörtern codiert.
+15.	Weiterer Zustand "read3" in die Statemachine vom ltm9007_14_adcData eingebaut, so dass immer Zeit zum auslesen der beiden anderen Kanäle bleibt.
+	(Hierdurch evtl. Korrektur des Jitters beim Lesen der 3 Datenblöcke) -- hat in verbindung mit syncmode 2 und 3 fehler beim Auslesen einzelner 
+	Kanäle ergeben. -> wieder entfernt !!!!, statdessen durch bit 4 in reg "10ee" ersetzt. 
+
+16.	neues Register  adr "10ee"   ltm9007_14_0w.debugFifocontrol, jetzt default 0; -- war unter 3. beschrieben --
+	zum Synchronisieren der Fifos der 3 Kanäle:
+	Bits 1..0:
+	0: no sync									-- wie bisher...
+	1: fifoempty Registered (read 1 clock später)	
+	2: fifoempty synchronisiert zwischen den 3 Kanälen und read 1 clock später	-- sollte für 3-kanal betrieb richtig sein, ist jetzt default aktiv--
+	Bit 4:
+	Enable Timer um immer mindestens 2 Clocks Pause zwischen 2 reads zu haben       -- nötig für 2/3 Kanal Betrieb
+	Bit 5:
+	Enable done eines kanals (in ltm9007_14_adcdata) beendet read in den anderen kanälen    
+	Bit 9..8:
+	0: wait 3 clocks before first read   -- evtl. sinnvoll zur synchronisation.... 
+ 	1: wait 2 clocks before first read 	
+	2: wait 1 clocks before first read
+ 	3: no wait before first read 
+	Reset an alle kleinen Fifos:
+	Bit 13..12:
+	0: Reset wie bisher nach startup
+ 	1: reset auf 0	
+	2: reset auf 1 
+ 	3: reset am Anfang jedes Datenblocks
+		
+		--> bisher sinnvolle einstellung 10ee=0x3032
+		--> für Einzelkanalbetieb 	 10ee=0x3030
+
+
+
+17.	adr "1114"  eventFifoSystem_0w.drs4ChipSelector hat neue Funktionen:
+	Bits 7..4:
+	Warte am ende des Datensamplens 1 bis 16 Takte, damit auch die letzten Bits noch gespeichert werden.
+	Bits 11..8:
+	Warte auf "cascadingdataready 1 bis 16 Takte, damit auch die letzten Bits noch gespeichert werden.
+
+18. 	Die Schreibtiefe der kleinen Fifos(x108,x109) wurde von 16 auf 32 erhöht.
+
+19.	Die fifos der rs485 Schnittstelle sind jetzt 2k statt 256 bytes gross, damit sind auch die Register 0x1320 bis 0x132e auf 11 Bit vergrössert.
+20.	Im Datenblock "cascading Date" sind jetzt die Kaskadierungsdaten von Kanal 0 bis 2 eingetragen (0. bis 2. 16 Bit-Wort)
+	Das miso-Signal kommt jetzt von den 3 verschiedenen DRS4 Quellen, damit sind die 3 rio und cascading daten von 3 DRS4 Quellen.
+	Zusätzlich sind die "ROI Daten" mit je 10 Bits in den Kanälen 4 bis 6 codiert (zur Kontrolle, sollten bis auf +/-1 gleich sein)
+	-> sind bis ca. 3 samples verschieden zueinander!!!
+	-> ROI und Cascading daten sind manchmal um 1 nach links oder rechts geshiftet!! Fehler!!!
+
+21. 	Die Triggerposition hat schon 10 Bit und ist damit ausreichend. Das Delay wird in 118,75 Mhz Takten gezählt. Die x-Position des Triggerpulses
+	ist damit bei etwa :
+
+		xpos = 4000- (1000 * Registerwert)/(118,75)[ns]
+
+	Registerwert 0 -> Xpos = 4000ns,  also fast am Ende der kaskadierten Darstellung
+	Registerwert 450 -> Xpos = 210ns, also fast am Anfang des kaskadierten Darstellung
+
+
+
+

@@ -1,0 +1,81 @@
+Infos zu TXAXI/ICESCINT FPGA Design:
+
+
+
+Modifikationen 5_7_2019:
+
+
+Die timingkritische Gleichung für die Lesedaten "readDataBuffer" konnte erheblich besser gestaltet werden, da dieses Signal keinen Reset benötigt.
+Damit ist die Decodierung nicht in der grossen if/then/else Verknüpfung. Hiermit kann das Design auch für den langsameren Speedgrade ohne Timingfehler 
+compiliert werden.
+
+Auf Adresse 0000 und 0002 sind ein 8 und ein 16 Bit Read/Write Register implementiert, das war schon bisher so, 
+hiermit lässt sich ein einfacher Test des Zugriffs machen.
+Zusätzlich sind folgende Register neu implementiert, hier ein auszug aus dem VHDL-Code:
+
+	when x"0004" => readDataBuffer <= x"5555";--test
+	when x"0006" => readDataBuffer <= x"aaaa";--test
+	when x"0008" => readDataBuffer <= x"0019";-- jahr
+	when x"000a" => readDataBuffer <= x"0005";-- monat
+	when x"000c" => readDataBuffer <= x"0028";-- tag 
+	when x"000e" => readDataBuffer <= x"0001";--version
+	when x"0010" => readDataBuffer <= x"00" & modus;--Neues modusregister read & write
+	when x"0012" => readDataBuffer <= (not dummycnt) & dummycnt; inccnt <= not controlBus.address(0) xor modus(0);
+
+Read-zugriffe:
+-- es werden auch in der 8 Bit Variante nur 16 Bit Zugriffe vom Arm ermöglicht, d.h. es sind nur Zugriffe auf gerade Byte-adressen möglich
+-- Adressleitung A0 ist damit unused
+Read-zugriffe funktionieren wie bisher, es werden die 16 bit ausgegeben, von denen der Arm wahlweise nur die nur 8 lsbs 
+verwenden kann. 
+Zum lesen sind die Adressen von 0000 bis 3fff auf 4000 bis 7fff gespiegelt, und die Adressen von c000 bis ffff auf 8000 bis bfff gespiegelt.
+Gespiegelt bedeutet hier, dass z.B. auf adresse x5234 dieselben Daten auszulesen sind wie auf x1234, wobei die 8 lsbs mit den 8 msbs vertauscht sind.
+
+Triggern durch read-Zugriff:
+Auf adresse 0100 wird das Fifo gelesen und das Weiterschalten des Fifos getriggert.
+der lesevorgang ist wie oben beschrieben, die Triggerfunktion funktioniert wie folgt:
+
+-- wenn modus(0)=0 dann wird auf adresse "0100" getriggert
+-- wenn modus(0)=1 dann wird auf adresse "4100" getriggert (Spiegelregisteradresse)
+
+Bei bisherigen 16 bit Zugriffen muss das neue Modusregister, Bit 0 auf 0 stehen, bei 2*8 Bit Zugriffen muss das Bit abhäbgig von der Reihenfolge
+der beiden Zugriffe gesetzt werden, so dass die Triggerfunktion auf den 2. Zugriff erfolgt.
+
+Write Zugriffe:
+Die Write zugriffe wurden wie folgt modifiziert:
+normalerweise funktionieren die Zugriffe wie bisher. Um auf 8 bit Modus umzuschalten, muss man bit 1 im "modus" register setzen.
+Dann sollte ein write vom Arm zunächst die 8MSBs der Registerwerts in ein Pufferregister (bits (7..0) an adresse 20) schreiben, 
+und dann die LSBs wie bisher an die Write-Adresse.
+
+Für die Änderungen mussten 2 Files modifiziert und im Projekt ausgetauscht werden: 
+
+registerInterface_iceScint.vhd  --> registerInterface_iceScint_mod.vhd
+
+smcBusWrapper.vhd  --> smcBusWrapper_mod.vhd
+
+in Types.VHD wurden die Variablen hinzugefügt.
+
+
+Neue Möglichkeiten zur Triggerung:
+
+Es existiert ein neues Register auf adresse 11ea:  --Achtung, Write-only!
+
+when x"11ea" => triggerLogic_0w.triggerSum <= dataBusbuf(7 downto 0);
+						
+Der defaultwert ist 0. Getriggert wird, wenn mehr als triggerSum Signale (von den 8 Inputs) hi sind. beim Defaultwert 0 
+entspricht das der bisherigen oder-Verknüpfung, bei einem Wert von z.B 3 müssen mindestens 4 Triggersignale gleichzeitig high sein.
+
+Es existiert ein neues Register auf adresse 11ec: --Achtung, Write-only!
+
+when x"11ec" => triggerLogic_0w.triggerSec <= dataBusbuf(7 downto 0);
+						
+Der Defaultwert ist 0xff. Es wird alle "triggerSec" Sekunden regelmässig getriggert. Wenn triggerSec > 127 (default) ist 
+diese Funktion disabled.
+
+Es werden 3 Bitfiles ausgeliefert:
+
+1.	taxitop_icescint_original_4_7_2019.bit		"Original" Radio design, könnte man zum test mit dem in der software
+							vorhandenen Bitfile vergleichen, sollte ausser Datum im Header gleich sein.
+2.	taxitop_icescint_8Bit_mod.bit			Obiges Design mit der aktuellen 8 Bit Modifikation.
+
+3.	taxitop_new_trigger.bit				Obiges Design mit den zusätzlichen Features "triggerSum" und "triggerSec".
+

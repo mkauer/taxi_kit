@@ -1,0 +1,17 @@
+Infos zu Pinswap im FPGA Design:
+
+Es sind 4 paare von pins in der Software vertauscht, so dass auch 4 Pind auf dem Fanout-Board vertauscht werden müssen.
+In der Tabelle 
+
+Pins_Fanout_Board_Pins swapped
+
+sind die zu vertauschenden Jumperpins dargestellt.
+immer 2 Pins derselben Farbe in der Tabelle sind umzulöten.
+
+z.B. in Gelb Dargestellt:
+
+Jumper 1802 Pin 1 muss mit Jumper 1302 Pin 2 vertauscht werden. 
+Ab besten über die direkt an den Jumpern sitzenden widerstände. 
+Damit sind am FPGA die Pins E20 und J22 Vertauscht. 
+
+
