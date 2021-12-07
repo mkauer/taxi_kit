@@ -1,5 +1,5 @@
 *~
-
+*.bit
 # intermediate build files
 *.bgn
 *.bld
