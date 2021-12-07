@@ -38,11 +38,6 @@ entity ltm9007_14_adcData is
 		bitslipStartLatched : in std_logic;
 		bitslipDone_TIG : out std_logic;
 		
-		ChannelID : in std_logic_vector(1 downto 0);
-		fifoemptyout : out std_logic_vector(1 downto 0);
-		fifoemptyinA : in std_logic_vector(1 downto 0);
-		fifoemptyinB : in std_logic_vector(1 downto 0);
-
 		drs4_to_ltm9007_14 : in drs4_to_ltm9007_14_t;
 		ltm9007_14_to_eventFifoSystem : out ltm9007_14_to_eventFifoSystem_t;
 		adcClocks : in adcClocks_t;
@@ -89,7 +84,6 @@ architecture Behavioral of ltm9007_14_adcData is
 	
 	signal fifoEmptyA : std_logic;
 	signal fifoEmptyB : std_logic;
-	signal fifoEmptyC : std_logic;
 	signal fifoValidA : std_logic;
 	signal fifoValidB : std_logic;
 
@@ -156,7 +150,7 @@ architecture Behavioral of ltm9007_14_adcData is
 	signal bitslipDoneSync : std_logic;
 	
 	signal adcDataValid : std_logic;
-	signal adcDataSkipCounter : integer range 0 to 7;
+	signal adcDataSkipCounter : integer range 0 to 31;
 	signal adcDataValidCounter : unsigned(15 downto 0);
 	signal adcDataStart_old : std_logic;
 	
@@ -193,10 +187,7 @@ architecture Behavioral of ltm9007_14_adcData is
 	
 	signal debugChannelSelector : std_logic_vector(2 downto 0);
 	signal debugFifoOut : std_logic_vector(15 downto 0);
-	signal offsetCorrectionRamWr : std_logic_vector(7 downto 0);
-	signal timer : std_logic_vector(1 downto 0);
-	signal fiforeset_idle : std_logic;
-
+	
 begin
 	
 	enc_p <= enc;
@@ -214,31 +205,13 @@ begin
 		if rising_edge(registerWrite.clock) then
 			numberOfSamplesToRead_TPTHRU_TIG <= registerWrite.numberOfSamplesToRead;
 			registerRead.fifoWordsA <= "000" & fifoWordsA;
---			registerRead.bitslipFailed <= bitslipFailed_TIG;
-			if ChannelID = "00" then
-				registerRead.bitslipFailed(1 downto 0) <= bitslipFailed_TIG;
-			end if;
-			if ChannelID = "01" then
-				registerRead.bitslipFailed(3 downto 2) <= bitslipFailed_TIG;
-			end if;
-			if ChannelID = "10" then
-				registerRead.bitslipFailed(5 downto 4) <= bitslipFailed_TIG;
-			end if;
+			registerRead.bitslipFailed <= bitslipFailed_TIG;
 		end if;
 	end process;
 	numberOfSamplesToRead_sync <= numberOfSamplesToRead_TPTHRU_TIG;
 
---	fifoReset_TPTHRU_TIG <= fifoReset; 
---	fifoReset_sync <= fifoReset_TPTHRU_TIG; -- removed _ Imm
-
---	fifoReset_sync       <= fifoReset when registerWrite.debugFifoControl(13 downto 12) = "00" else
-	fifoReset_TPTHRU_TIG <= fifoReset when registerWrite.debugFifoControl(13 downto 12) = "00" else
-									  '0' 	 when registerWrite.debugFifoControl(13 downto 12) = "01" else 
-									  '1' 	 when registerWrite.debugFifoControl(13 downto 12) = "10" else 
-									  '1' 	 when fiforeset_idle = '1' else 
-									  '0';
-	
-	fifoReset_sync <= fifoReset_TPTHRU_TIG;
+	fifoReset_TPTHRU_TIG <= fifoReset; 
+	fifoReset_sync <= fifoReset_TPTHRU_TIG; 
 	
 	bitslipFailed_TPTHRU_TIG <= bitslipFailed;
 	bitslipFailed_TIG <= bitslipFailed_TPTHRU_TIG;
@@ -258,12 +231,7 @@ begin
 	adcDataGroupB_n <= adcDataA_n(7) & adcDataA_n(5) & adcDataA_n(3) & adcDataA_n(1);
 	
 	bitslipPattern <= registerWrite.bitslipPattern when (bitslipPatternOverride = '0') else ltm9007_14_bitslipPattern; --"1100101";
-		
-	bitslipStart1 <= 	(registerWrite.bitslipStart(0) or bitslipStart2)  when  ChannelID = "00" else
-							(registerWrite.bitslipStart(1) or bitslipStart2)  when  ChannelID = "01" else
-							(registerWrite.bitslipStart(2) or bitslipStart2)  ;
-	
-	
+	bitslipStart1 <= registerWrite.bitslipStart or bitslipStart2;
 	--registerRead.bitslipFailed <= bitslipFailed; -- ## sync
 	registerRead.bitslipPattern <= registerWrite.bitslipPattern;
 	
@@ -333,15 +301,12 @@ begin
 	registerRead.baselineStart <= registerWrite.baselineStart;
 	registerRead.baselineEnd <= registerWrite.baselineEnd;
 
-	offsetCorrectionRamWr <= registerWrite.offsetCorrectionRamWrite(7 downto 0) when (ChannelID = registerWrite.offsetCorrectionRamAddress(11 downto 10)) else "00000000";
-
 	g110: for i in 0 to 7 generate
 		x110: entity work.drs4OffsetCorrectionRam port map(
 			registerWrite.clock,
 			registerWrite.reset,
-			--registerWrite.offsetCorrectionRamWrite(i downto i),
-			offsetCorrectionRamWr(i downto i),
-			registerWrite.offsetCorrectionRamAddress(9 downto 0),
+			registerWrite.offsetCorrectionRamWrite(i downto i),
+			registerWrite.offsetCorrectionRamAddress,
 			registerWrite.offsetCorrectionRamData,
 			registerRead.offsetCorrectionRamData(i), -- ## implement mux here....
 			registerWrite.clock,
@@ -360,7 +325,6 @@ begin
 	begin
 		if rising_edge(registerWrite.clock) then
 			adcDataStartSync <= adcDataStart_66_TPTHRU_TIG & adcDataStartSync(adcDataStartSync'length-1 downto 1);
---			adcDataStartSync <= adcDataStart_66 & adcDataStartSync(adcDataStartSync'length-1 downto 1);
 			if (registerWrite.reset = '1') then
 				adcDataStart <= '0';
 			else
@@ -393,14 +357,10 @@ begin
 						adcDataSkipCounter <= 1;
 						if(adcDataStart_old = '0' and adcDataStart_66 = '1') then
 							stateAdcFifoData <= skip;
-							fiforeset_idle <= '1';
 						end if;
 
 					when skip =>
 						adcDataSkipCounter <= adcDataSkipCounter + 1;
-						if(adcDataSkipCounter = 2) then
-							fiforeset_idle <= '0';
-						end if;
 						if(adcDataSkipCounter >= 6) then
 							stateAdcFifoData <= valid1;
 							adcDataValidCounter <= unsigned(numberOfSamplesToRead); 
@@ -471,8 +431,6 @@ begin
 		end if;
 	end process P10;
 
-   fifoemptyout(0) <= fifoemptyA;
-	
 	P4:process (registerWrite.clock)
 	--	variable sampleBufferTwisted : data8x16Bit_t; 
 		variable sampleBuffer : data8x16Bit_t; 
@@ -485,15 +443,6 @@ begin
 			ltm9007_14_to_eventFifoSystem.samplingDone <= '0'; -- autoreset
 			ltm9007_14_to_eventFifoSystem.chargeDone <= '0'; -- autoreset
 			ltm9007_14_to_eventFifoSystem.baselineDone <= '0'; -- autoreset
-			fifoemptyout(1) <= '0';
-			
-			if registerWrite.debugFifoControl(1 downto 0) =	"01" then		
-				fifoemptyC <= fifoemptyA;
-			else		
-				fifoemptyC <= fifoemptyA or fifoemptyinA(0) or fifoemptyinB(0) ;
-			end if;
-		
-			
 			if (registerWrite.reset = '1') then
 				eventFifoFullCounterA <= to_unsigned(0,eventFifoFullCounterA'length);
 				eventFifoOverflowCounterA <= to_unsigned(0,eventFifoOverflowCounterA'length);
@@ -557,27 +506,17 @@ begin
 							baselineBuffer <= (others=>(others=>'0'));
 							baselineStart <= registerWrite.baselineStart;
 							baselineEnd <= registerWrite.baselineEnd;
-							timer <= registerWrite.debugFifoControl(9 downto 8);-- wait 0 to 3 clocks for first read.
 						end if;
 
 					when read1 =>
 					--if(fifoWordsA /= "00000") then
-						if (((fifoEmptyA = '0') and (registerWrite.debugFifoControl(1 downto 0) = "00"))		
-						or ((fifoEmptyC = '0') and not(registerWrite.debugFifoControl(1 downto 0) = "00")))
-						and ((timer = "11") or (registerWrite.debugFifoControl(4) = '0')) then		
+						if(fifoEmptyA = '0') then
 							fifoReadEnableA <= '1'; -- autoreset
 							fifoReadEnableB <= '1'; -- autoreset
 							stateFifoRead <= read2;
-							timer <= "01";
-						else
-							if 	(timer = "00") then timer <= "01";
-							elsif (timer = "01") then timer <= "10";
-							elsif (timer = "10") then timer <= "11";
-							end if;
 						end if;
 
-						if(adcDataFifoCounter >= unsigned(numberOfSamplesToReadLatched))
-						or ((registerWrite.debugFifoControl(5)='1') and ((fifoemptyinA(1) or fifoemptyinB(1))= '1')) then --
+						if(adcDataFifoCounter >= unsigned(numberOfSamplesToReadLatched)) then
 							stateFifoRead <= done;
 						end if;
 
@@ -587,15 +526,27 @@ begin
 				--end if;	
 
 					when read2 =>
-						if 	(timer = "00") then timer <= "01";
-						elsif (timer = "01") then timer <= "10";
-						elsif (timer = "10") then timer <= "11";
-						end if;
 						if(fifoValidA = '1') then -- ## fifo B is allways the same...
 							l0: for i in 0 to 3 loop
 								fifoOutTwisted(i) := "00" & fifoOutA(13+i*14 downto 0+i*14);
 								fifoOutTwisted(i+4) := "00" & fifoOutB(13+i*14 downto 0+i*14);
 							end loop;
+
+						--						l0: for i in 0 to 3 loop
+						--							sampleBufferTwisted(i) := std_logic_vector(resize(unsigned(fifoOutA(13+i*14 downto 0+i*14)),16) + resize(unsigned(offsetCorrectionRamData(i)),16));
+						--							sampleBufferTwisted(i+4) := std_logic_vector(resize(unsigned(fifoOutB(13+i*14 downto 0+i*14)),16) + resize(unsigned(offsetCorrectionRamData(i+4)),16));
+						--							--sampleBufferTwisted(i) := std_logic_vector(resize(unsigned(fifoOutA(13+i*14 downto 0+i*14)),16) + resize(unsigned(offsetCorrectionRamData(i)),16));
+						--							--sampleBufferTwisted(i+4) := std_logic_vector(resize(unsigned(fifoOutB(13+i*14 downto 0+i*14)),16) + resize(unsigned(offsetCorrectionRamData(i+4)),16));
+						--						end loop;
+
+						--						sampleBuffer(0) := sampleBufferTwisted(7);
+						--						sampleBuffer(1) := sampleBufferTwisted(5);
+						--						sampleBuffer(2) := sampleBufferTwisted(3);
+						--						sampleBuffer(3) := sampleBufferTwisted(1);
+						--						sampleBuffer(4) := sampleBufferTwisted(6);
+						--						sampleBuffer(5) := sampleBufferTwisted(4);
+						--						sampleBuffer(6) := sampleBufferTwisted(2);
+						--						sampleBuffer(7) := sampleBufferTwisted(0);
 
 							l1: for i in 0 to 7 loop
 								sampleBuffer(i) := std_logic_vector(unsigned(fifoOutTwisted(adcChannelUntwist(i))) + resize(unsigned(offsetCorrectionRamData(i)),16));
@@ -619,7 +570,10 @@ begin
 							adcDataFifoCounter <= adcDataFifoCounter + 1;
 							stateFifoRead <= read1;
 						end if;
-					
+
+				--if(adcDataFifoCounter >= unsigned(numberOfSamplesToReadLatched)) then
+				--	stateFifoRead <= done;
+				--end if;
 
 					when done =>
 						stateFifoRead <= idle;
@@ -630,7 +584,7 @@ begin
 						ltm9007_14_to_eventFifoSystem.chargeDone <= '1'; -- autoreset
 						ltm9007_14_to_eventFifoSystem.baseline <= baselineBuffer;
 						ltm9007_14_to_eventFifoSystem.baselineDone <= '1'; -- autoreset
-						fifoemptyout(1) <= '1'; -- autoreset
+
 					when others => null;
 				end case;
 

@@ -22,7 +22,7 @@
 --    devices, or systems.  Use in such applications are expressly            --
 --    prohibited.                                                             --
 --                                                                            --
---    (c) Copyright 1995-2019 Xilinx, Inc.                                    --
+--    (c) Copyright 1995-2017 Xilinx, Inc.                                    --
 --    All rights reserved.                                                    --
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -108,7 +108,7 @@ END COMPONENT;
       c_axis_type => 0,
       c_common_clock => 0,
       c_count_type => 0,
-      c_data_count_width => 5,
+      c_data_count_width => 4,
       c_default_value => "BlankString",
       c_din_width => 56,
       c_din_width_axis => 1,
@@ -207,14 +207,14 @@ END COMPONENT;
       c_prog_empty_type_wach => 0,
       c_prog_empty_type_wdch => 0,
       c_prog_empty_type_wrch => 0,
-      c_prog_full_thresh_assert_val => 29,
+      c_prog_full_thresh_assert_val => 13,
       c_prog_full_thresh_assert_val_axis => 1023,
       c_prog_full_thresh_assert_val_rach => 1023,
       c_prog_full_thresh_assert_val_rdch => 1023,
       c_prog_full_thresh_assert_val_wach => 1023,
       c_prog_full_thresh_assert_val_wdch => 1023,
       c_prog_full_thresh_assert_val_wrch => 1023,
-      c_prog_full_thresh_negate_val => 28,
+      c_prog_full_thresh_negate_val => 12,
       c_prog_full_type => 0,
       c_prog_full_type_axis => 0,
       c_prog_full_type_rach => 0,
@@ -224,9 +224,9 @@ END COMPONENT;
       c_prog_full_type_wrch => 0,
       c_rach_type => 0,
       c_rd_data_count_width => 4,
-      c_rd_depth => 32,
+      c_rd_depth => 16,
       c_rd_freq => 1,
-      c_rd_pntr_width => 5,
+      c_rd_pntr_width => 4,
       c_rdch_type => 0,
       c_reg_slice_mode_axis => 0,
       c_reg_slice_mode_rach => 0,
@@ -255,7 +255,7 @@ END COMPONENT;
       c_wdch_type => 0,
       c_wr_ack_low => 0,
       c_wr_data_count_width => 4,
-      c_wr_depth => 32,
+      c_wr_depth => 16,
       c_wr_depth_axis => 1024,
       c_wr_depth_rach => 16,
       c_wr_depth_rdch => 1024,
@@ -263,7 +263,7 @@ END COMPONENT;
       c_wr_depth_wdch => 1024,
       c_wr_depth_wrch => 16,
       c_wr_freq => 1,
-      c_wr_pntr_width => 5,
+      c_wr_pntr_width => 4,
       c_wr_pntr_width_axis => 10,
       c_wr_pntr_width_rach => 4,
       c_wr_pntr_width_rdch => 10,

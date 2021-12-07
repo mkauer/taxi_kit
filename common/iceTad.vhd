@@ -109,7 +109,7 @@ begin
 			dout => registerRead.rs485FifoData(i),
 			full => registerRead.rs485FifoFull(i),
 			empty => registerRead.rs485FifoEmpty(i),
-			data_count => registerRead.rs485FifoWords(i)(10 downto 0)
+			data_count => registerRead.rs485FifoWords(i)(7 downto 0)
 		);
 	
 		--registerRead.rs485FifoWords(i)(7 downto 6) <= "0";

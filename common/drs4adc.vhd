@@ -52,11 +52,6 @@ entity drs4adc is
 		--ltm9007_14_to_eventFifoSystem : out ltm9007_14_to_eventFifoSystem_t;
 		--adcClocks : in adcClocks_t;
 		drs4AndAdcData : out drs4AndAdcData_t;
-
-		ChannelID : in std_logic_vector(1 downto 0);
-		fifoemptyout : out std_logic_vector(1 downto 0);
-		fifoemptyinA : in std_logic_vector(1 downto 0);
-		fifoemptyinB : in std_logic_vector(1 downto 0);
 		
 		registerRead : out ltm9007_14_registerRead_t;
 		registerWrite : in ltm9007_14_registerWrite_t
@@ -81,8 +76,7 @@ architecture Behavioral of drs4adc is
 
 	signal drs4_to_eventFifoSystem : drs4_to_eventFifoSystem_t;
 	signal ltm9007_14_to_eventFifoSystem : ltm9007_14_to_eventFifoSystem_t;
-	signal bitslipStartExtern : std_logic;
-	
+
 begin
 
 	drs4AndAdcData.adcData <= ltm9007_14_to_eventFifoSystem;
@@ -106,24 +100,16 @@ begin
 	--j0: OBUF port map(O => nCSA0, I => notChipSelectA);
 	--j1: OBUF port map(O => nCSB0, I => notChipSelectB);
 	
-	bitslipStartExtern <= 	registerWrite.bitslipStart(0)  when  ChannelID = "00" else
-									registerWrite.bitslipStart(1)  when  ChannelID = "01" else
-									registerWrite.bitslipStart(2) ;
-	
-	
 	y1: entity work.ltm9007_14_slowControl port map(
 		registerWrite.clock, registerWrite.reset,
 		nCSA0, nCSB0, mosi, sclk,
-		registerWrite.init, bitslipDone_TPTHRU_TIG, bitslipStart, bitslipStartExtern ,
+		registerWrite.init, bitslipDone_TPTHRU_TIG, bitslipStart, registerWrite.bitslipStart,
 		LTM9007_14_BITSLIPPATTERN, registerWrite.testMode, registerWrite.testPattern);
 
 	y2: entity work.ltm9007_14_adcData port map(
+		--enc_p0, enc_n0, adcDataA_p0, adcDataA_n0,
 		enc0, adcDataA_p0, adcDataA_n0,
 		bitslipStart_TPTHRU_TIG, bitslipDone,
-		ChannelID,
-		fifoemptyout,
-		fifoemptyinA,
-		fifoemptyinB,
 		drs4_to_ltm9007_14, ltm9007_14_to_eventFifoSystem, adcClocks, registerRead, registerWrite);
 
 --end generate; 

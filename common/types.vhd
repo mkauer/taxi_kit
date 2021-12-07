@@ -24,7 +24,6 @@ package types is
 	constant LTM9007_14_BITSLIPPATTERN : std_logic_vector(6 downto 0) := "1100101";
 	
 	type dataNumberOfChannelsX8Bit_t is array (0 to numberOfChannels-1) of std_logic_vector(7 downto 0);
-	type dataNumberOfChannelsX11Bit_t is array (0 to numberOfChannels-1) of std_logic_vector(10 downto 0);
 	type dataNumberOfChannelsX12Bit_t is array (0 to numberOfChannels-1) of std_logic_vector(11 downto 0);
 	type dataNumberOfChannelsX16Bit_t is array (0 to numberOfChannels-1) of std_logic_vector(15 downto 0);
 	type dataNumberOfChannelsX24Bit_t is array (0 to numberOfChannels-1) of std_logic_vector(23 downto 0);
@@ -158,7 +157,7 @@ package types is
 		eventRateCounter : std_logic_vector(15 downto 0);
 		eventLostRateCounter : std_logic_vector(15 downto 0);
 		deviceId : std_logic_vector(15 downto 0);
-		drs4ChipSelector : std_logic_vector(15 downto 0);
+		drs4ChipSelector : std_logic_vector(3 downto 0);
 		debugFifoOut : std_logic_vector(15 downto 0);
 	end record;
 	type eventFifoSystem_registerWrite_t is record
@@ -178,7 +177,7 @@ package types is
 		deviceId : std_logic_vector(15 downto 0);
 		miscSlotA : data8x16Bit_t;
 		miscSlotB : data8x16Bit_t;
-		drs4ChipSelector : std_logic_vector(15 downto 0);
+		drs4ChipSelector : std_logic_vector(3 downto 0);
 	end record;
 
 -------------------------------------------------------------------------------
@@ -579,8 +578,8 @@ package types is
 		testMode : std_logic_vector(3 downto 0);
 		testPattern : std_logic_vector(13 downto 0);
 		bitslipPattern : std_logic_vector(6 downto 0);
-		bitslipFailed : std_logic_vector(5 downto 0);
-		offsetCorrectionRamAddress : std_logic_vector(11 downto 0);
+		bitslipFailed : std_logic_vector(1 downto 0);
+		offsetCorrectionRamAddress : std_logic_vector(9 downto 0);
 		offsetCorrectionRamData : data8x16Bit_t;
 		offsetCorrectionRamWrite : std_logic_vector(7 downto 0);
 		fifoEmptyA : std_logic;
@@ -590,7 +589,6 @@ package types is
 		baselineStart : std_logic_vector(9 downto 0);
 		baselineEnd : std_logic_vector(9 downto 0);
 		debugChannelSelector : std_logic_vector(2 downto 0);
-		debugFifoControl : std_logic_vector(15 downto 0);
 		debugFifoOut : std_logic_vector(15 downto 0);
 	end record;
 	type ltm9007_14_registerWrite_t is record
@@ -601,14 +599,13 @@ package types is
 		testPattern : std_logic_vector(13 downto 0);
 		bitslipPattern : std_logic_vector(6 downto 0);
 		numberOfSamplesToRead : std_logic_vector(15 downto 0);
-		bitslipStart : std_logic_vector(2 downto 0);
-		offsetCorrectionRamAddress : std_logic_vector(11 downto 0);
+		bitslipStart : std_logic;
+		offsetCorrectionRamAddress : std_logic_vector(9 downto 0);
 		offsetCorrectionRamData : std_logic_vector(15 downto 0);
 		offsetCorrectionRamWrite : std_logic_vector(7 downto 0);
 		baselineStart : std_logic_vector(9 downto 0);
 		baselineEnd : std_logic_vector(9 downto 0);
 		debugChannelSelector : std_logic_vector(2 downto 0);
-		debugFifoControl : std_logic_vector(15 downto 0);
 	end record;
 
 -------------------------------------------------------------------------------
@@ -691,7 +688,7 @@ package types is
 		rs485RxBusy : std_logic_vector(7 downto 0);
 		rs485TxBusy : std_logic_vector(7 downto 0);
 		rs485FifoData : dataNumberOfChannelsX8Bit_t;
-		rs485FifoWords : dataNumberOfChannelsX11Bit_t;
+		rs485FifoWords : dataNumberOfChannelsX8Bit_t;
 		--rs485FifoFull : dataNumberOfChannels_t;
 		rs485FifoFull : std_logic_vector(7 downto 0);
 		rs485FifoEmpty : std_logic_vector(7 downto 0);

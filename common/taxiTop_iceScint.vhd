@@ -50,8 +50,7 @@ entity taxiTop_iceScint is
 		--DISCR_OUT_2N  : in std_logic_vector(7 downto 0);
 		--DISCR_OUT_3P  : in std_logic_vector(7 downto 0); -- LVDS, discriminator outputs
 		--DISCR_OUT_1N  : in std_logic_vector(7 downto 0);
-		DISCR_OUT_Dummy : in std_logic_vector(11 downto 0);
---		NOT_USED_GND  : out std_logic_vector(7 downto 0); -- DISCR_OUT_2P + DISCR_OUT_3P
+		NOT_USED_GND  : out std_logic_vector(7 downto 0); -- DISCR_OUT_2P + DISCR_OUT_3P
 		PANEL_NP24V_ON  : out std_logic_vector(7 downto 0); -- DISCR_OUT_2N + DISCR_OUT_3N
 --		PANEL_RS485_D : inout std_logic_vector(7 downto 0); -- DISCR_OUT_2N + DISCR_OUT_3N
 		PANEL_RS485_RX : in std_logic_vector(7 downto 0); 
@@ -241,7 +240,6 @@ architecture behaviour of taxiTop_iceScint is
 	signal drs4_1w : drs4_registerWrite_t;
 	signal drs4_2r : drs4_registerRead_t;
 	signal drs4_2w : drs4_registerWrite_t;
-	signal ltm9007_14r : ltm9007_14_registerRead_t;
 	signal ltm9007_14_0r : ltm9007_14_registerRead_t;
 	signal ltm9007_14_0w : ltm9007_14_registerWrite_t;
 	signal ltm9007_14_1r : ltm9007_14_registerRead_t;
@@ -336,20 +334,16 @@ architecture behaviour of taxiTop_iceScint is
 	signal dwrite : std_logic;
 	signal rsrload : std_logic;
 	signal mosi : std_logic;
-	signal miso,miso2,miso3 : std_logic;
+	signal miso : std_logic;
 	signal srclk : std_logic;
-	signal dtap,dtap2,dtap3 : std_logic;
-	signal plllck,plllck2,plllck3 : std_logic;
+	signal dtap : std_logic;
+	signal plllck : std_logic;
 	signal address : std_logic_vector(3 downto 0);
 	signal notChipSelectA : std_logic;
 	signal notChipSelectB : std_logic;
 	signal enc : std_logic;
-	signal sdaout,sdaint,sclint : std_logic;
-	signal fifo : std_logic_vector(5 downto 0);
 
-
-
-
+	signal sdaout,sdaint : std_logic;
 	COMPONENT I2CModule
 	PORT(
 		clk : IN std_logic;
@@ -376,7 +370,7 @@ begin
 		--i2: IBUFDS generic map(DIFF_TERM => true) port map (I => DISCR_OUT_2P(i), IB => DISCR_OUT_2N(i), O => discriminator(1)(i));
 		--i3: IBUFDS generic map(DIFF_TERM => true) port map (I => DISCR_OUT_3P(i), IB => DISCR_OUT_3N(i), O => discriminator(2)(i));
 
---		j0: OBUF port map (O => NOT_USED_GND(i), I => '0');
+		j0: OBUF port map (O => NOT_USED_GND(i), I => '0');
 		j1: OBUFT port map (O => PANEL_NP24V_ON(i), I => nP24VOn(i), T => nP24VOnTristate(i));
 --		j2: IOBUF port map (IO => PANEL_RS485_D(i), I => rs485DataOut(i), O => rs485DataIn(i), T => rs485DataTristate(i));
 		j2a: IBUF port map(I => PANEL_RS485_RX(i), O => rs485DataIn(i));
@@ -400,7 +394,7 @@ begin
 	i2: IBUFDS generic map(DIFF_TERM => true) port map (I => ADC_DCO_4P, IB => ADC_DCO_4N, O => open);
 
 	i3: IBUFDS generic map(DIFF_TERM => true) port map (I => EXT_CLK_P, IB => EXT_CLK_N, O => whiteRabbitClockIn);
-	i4: IBUFDS generic map(DIFF_TERM => true) port map (I => EXT_PPS_P, IB => EXT_PPS_N, O => whiteRabbitPpsIregbIn);
+	i4: IBUFDS generic map(DIFF_TERM => true) port map (I => EXT_PPS_P, IB => EXT_PPS_N, O => open);
 	i5: IBUFDS generic map(DIFF_TERM => true) port map (I => EXT_TRIG_IN_P, IB => EXT_TRIG_IN_N, O => open);
 
 	i6: OBUFDS port map(O => EXT_TRIG_OUT_P, OB => EXT_TRIG_OUT_N, I => '0');
@@ -527,8 +521,8 @@ begin
 
 	i45: IOBUF port map(O => open, IO => ADDR_64BIT, I => '0', T => '1');
 
---	i46: IOBUF port map(O => open, IO => TEST_DAC_SCL, I => '0', T => '1');
---	i47: IOBUF port map(O => open, IO => TEST_DAC_SDA, I => '0', T => '1');
+	i46: IOBUF port map(O => open, IO => TEST_DAC_SCL, I => '0', T => '1');
+	i47: IOBUF port map(O => open, IO => TEST_DAC_SDA, I => '0', T => '1');
 
 	i48: IBUF port map(I => QOSC1_OUT, O => open);
 	i49: IBUF port map(I => POW_ALERT, O => open);
@@ -538,7 +532,7 @@ begin
 
 	asyncReset <= not(PON_RESETn and clockValid);
 
-	-- whiteRabbitPpsIregbIn <= whiteRabbitPpsIregbInX or whiteRabbitPpsIregbInZ;
+	whiteRabbitPpsIregbIn <= whiteRabbitPpsIregbInX or whiteRabbitPpsIregbInZ;
 
 	vcxoQ2Enable <= '0'; -- Q2 not mounted
 
@@ -624,20 +618,20 @@ begin
 	z22: OBUF port map(O => DRS4_DWRITE(2), I => dwrite);
 	z23: OBUF port map(O => DRS4_RSLOAD(2), I => rsrload);
 	z24: OBUF port map(O => DRS4_SRIN(2), I => mosi);
-	z25: IBUF port map(I => DRS4_SROUT(2), O => miso2);
+	z25: IBUF port map(I => DRS4_SROUT(2), O => open);
 	z26: OBUF port map(O => DRS4_SRCLK(2), I => srclk);
-	z27: IBUF port map(I => DRS4_DTAP(2), O => dtap2);
-	z28: IBUF port map(I => DRS4_PLLLCK(2), O => plllck2);
+	z27: IBUF port map(I => DRS4_DTAP(2), O => open);
+	z28: IBUF port map(I => DRS4_PLLLCK(2), O => open);
 	
 	z30: OBUF port map(O => DRS4_RESETn(3), I => notReset);
 	z31: OBUF port map(O => DRS4_DENABLE(3), I => denable);
 	z32: OBUF port map(O => DRS4_DWRITE(3), I => dwrite);
 	z33: OBUF port map(O => DRS4_RSLOAD(3), I => rsrload);
 	z34: OBUF port map(O => DRS4_SRIN(3), I => mosi);
-	z35: IBUF port map(I => DRS4_SROUT(3), O => miso3);
+	z35: IBUF port map(I => DRS4_SROUT(3), O => open);
 	z36: OBUF port map(O => DRS4_SRCLK(3), I => srclk);
-	z37: IBUF port map(I => DRS4_DTAP(3), O => dtap3);
-	z38: IBUF port map(I => DRS4_PLLLCK(3), O => plllck3);
+	z37: IBUF port map(I => DRS4_DTAP(3), O => open);
+	z38: IBUF port map(I => DRS4_PLLLCK(3), O => open);
 		
 	l00: OBUF port map(O => ADC_CSA(1), I => notChipSelectA);
 	l01: OBUF port map(O => ADC_CSB(1), I => notChipSelectB);
@@ -654,36 +648,21 @@ begin
 		address, notReset, denable, dwrite, rsrload, miso, mosi, srclk, dtap, plllck,
 		deadTime, triggerDRS4, internalTiming, adcClocks, drs4_0r, drs4_0w,
 		notChipSelectA, notChipSelectB, adcSdi, adcSck, enc, ADC_OUTA_1P, ADC_OUTA_1N,
-		drs4AndAdcData(0),	
-		"00",
-		fifo(1 downto 0),
-		fifo(3 downto 2),
-		fifo(5 downto 4),
-		ltm9007_14_0r, ltm9007_14_0w
+		drs4AndAdcData(0),	ltm9007_14_0r, ltm9007_14_0w
 		);
 	
 	x16b: entity work.drs4adc port map(
-		open, open, open, open, open, miso2, open, open, dtap2, plllck2,
+		open, open, open, open, open, miso, open, open, dtap, plllck,
 		open, triggerDRS4, internalTiming, adcClocks, drs4_1r, drs4_0w,
 		open, open, open, open, open, ADC_OUTA_2P, ADC_OUTA_2N,
-		drs4AndAdcData(1),	
-		"01",
-		fifo(3 downto 2),
-		fifo(1 downto 0),
-		fifo(5 downto 4),
-		ltm9007_14_1r, ltm9007_14_0w
+		drs4AndAdcData(1),	ltm9007_14_1r, ltm9007_14_0w
 		);
 	
 	x16c: entity work.drs4adc port map(
-		open, open, open, open, open, miso3, open, open, dtap3, plllck3,
+		open, open, open, open, open, miso, open, open, dtap, plllck,
 		open, triggerDRS4, internalTiming, adcClocks, drs4_2r, drs4_0w,
 		open, open, open, open, open, ADC_OUTA_3P, ADC_OUTA_3N,
-		drs4AndAdcData(2),	
-		"10",
-		fifo(5 downto 4),
-		fifo(3 downto 2),
-		fifo(1 downto 0),
-		ltm9007_14_2r, ltm9007_14_0w
+		drs4AndAdcData(2),	ltm9007_14_2r, ltm9007_14_0w
 		);
 
 
@@ -721,26 +700,6 @@ begin
 	
 	x20: entity work.tmp05 port map(TEMPERATURE, tmp05_0r, tmp05_0w);
 
-
----  Read fast aller daten von Kanal 0 
-	ltm9007_14r.testMode <= ltm9007_14_0r.testMode;
-	ltm9007_14r.testPattern <= ltm9007_14_0r.testPattern;
-	ltm9007_14r.bitslipPattern <= ltm9007_14_0r.bitslipPattern;
-	ltm9007_14r.bitslipFailed <= ltm9007_14_0r.bitslipFailed or ltm9007_14_1r.bitslipFailed or ltm9007_14_2r.bitslipFailed;-- alle 3 Kanäle verodert...
-	ltm9007_14r.offsetCorrectionRamAddress <= ltm9007_14_0r.offsetCorrectionRamAddress;
-	ltm9007_14r.offsetCorrectionRamData <= ltm9007_14_0r.offsetCorrectionRamData;
-	ltm9007_14r.offsetCorrectionRamWrite <= ltm9007_14_0r.offsetCorrectionRamWrite;
-	ltm9007_14r.fifoEmptyA <= ltm9007_14_0r.fifoEmptyA;
-	ltm9007_14r.fifoValidA <= ltm9007_14_0r.fifoValidA;
-	ltm9007_14r.fifoWordsA <= ltm9007_14_0r.fifoWordsA;
-	ltm9007_14r.baselineStart <= ltm9007_14_0r.baselineStart;
-	ltm9007_14r.baselineEnd <= ltm9007_14_0r.baselineEnd;
-	ltm9007_14r.debugChannelSelector <= ltm9007_14_0r.debugChannelSelector;
-	ltm9007_14r.debugFifoControl <= ltm9007_14_0r.debugFifoControl; 
-	ltm9007_14r.testMode <= ltm9007_14_0r.testMode;
-	ltm9007_14r.debugFifoOut <= ltm9007_14_0r.debugFifoOut;
-
-
 	x3: entity work.registerInterface_iceScint port map(addressAndControlBus, ebiDataIn, ebiDataOut,
 		triggerTimeToRisingEdge_0r,
 		triggerTimeToRisingEdge_0w,
@@ -764,8 +723,7 @@ begin
 		ad56x1_0w,
 		drs4_0r,
 		drs4_0w,
---		ltm9007_14_0r,
-		ltm9007_14r,
+		ltm9007_14_0r,
 		ltm9007_14_0w,
 		triggerLogic_0r,
 		triggerLogic_0w,
@@ -782,25 +740,13 @@ begin
 	
 	Inst_I2CModule: I2CModule PORT MAP(
 		clk => triggerSerdesClocks.serdesDivClock,
-		scl => sclint,
+		scl => scl,
 		sdaout => sdaout,
 		sdaint => sdaint,
 		registerRead => i2c_control_r,
 		registerWrite => i2c_control_w
 	);
 
---	sda <= '0' when sdaout = '0' else 'Z';
---	sdaint <= sda; 
---- zweites paralelles i2c Interface:
---clocks:
-scl 					<= sclint;
-test_dac_scl 		<= sclint;
---sdaout
-sda 					<= '0' when sdaout = '0' else 'Z';
-test_dac_sda 		<= '0' when sdaout = '0' else 'Z';
--- sda in:
-sdaint <= sda and test_dac_sda; 
-
-
-
+	sda <= '0' when sdaout = '0' else 'Z';
+	sdaint <= sda; 
 end behaviour;
